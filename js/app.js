@@ -60,14 +60,8 @@ function setupImageZone() {
       if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
-        state.images.push({
-          mediaType: file.type || 'image/png',
-          data: ev.target.result.split(',')[1],
-          name: `スクリーンショット_${Date.now()}_${idx + 1}.png`,
-          preview: ev.target.result,
-        });
-        renderImagePreviews();
-        updateAuditButton();
+        const pasteName = `スクリーンショット_${Date.now()}_${idx + 1}.png`;
+        compressImage(ev.target.result, pasteName);
         flashPasteZone();
       };
       reader.readAsDataURL(file);
@@ -107,17 +101,53 @@ function handleImages(files) {
     .forEach(file => {
       const reader = new FileReader();
       reader.onload = e => {
-        state.images.push({
-          mediaType: file.type,
-          data: e.target.result.split(',')[1],
-          name: file.name,
-          preview: e.target.result,
-        });
-        renderImagePreviews();
-        updateAuditButton();
+        compressImage(e.target.result, file.name);
       };
       reader.readAsDataURL(file);
     });
+}
+
+function compressImage(dataUrl, name) {
+  const img = new Image();
+  img.onload = () => {
+    const MAX_PX = 2048;
+    const MAX_BYTES = 4.5 * 1024 * 1024;
+    let { width, height } = img;
+    if (width > MAX_PX || height > MAX_PX) {
+      const scale = MAX_PX / Math.max(width, height);
+      width  = Math.round(width  * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    let quality = 0.85;
+    let result  = canvas.toDataURL('image/jpeg', quality);
+    while (result.length * 0.75 > MAX_BYTES && quality > 0.4) {
+      quality -= 0.1;
+      result   = canvas.toDataURL('image/jpeg', quality);
+    }
+
+    if (result.length * 0.75 > MAX_BYTES) {
+      alert(`「${name}」は圧縮後もサイズが大きすぎるため追加できませんでした。より小さい画像を使用してください。`);
+      return;
+    }
+
+    state.images.push({
+      mediaType: 'image/jpeg',
+      data:      result.split(',')[1],
+      name,
+      preview:   result,
+    });
+    renderImagePreviews();
+    updateAuditButton();
+  };
+  img.src = dataUrl;
 }
 
 function renderImagePreviews() {
