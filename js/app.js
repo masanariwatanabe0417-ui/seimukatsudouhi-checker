@@ -8,6 +8,10 @@ const state = {
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
   loadSettingsToForm();
   loadKnowledgeBaseToForm();
   setupDropZones();
@@ -412,19 +416,12 @@ async function handleKBFile(e) {
 }
 
 async function handleKBPDF(file, type) {
-  const settings = Storage.getSettings();
-  if (!settings.apiKey) {
-    alert('PDFの読み込みにはAPIキーが必要です。先に「設定」からClaude APIキーを入力して保存してください。');
-    return;
-  }
-
   const statusEl = document.getElementById(`kb-${type}-status`);
   statusEl.textContent = '⏳ PDF処理中... テキストを抽出しています（数秒かかります）';
   statusEl.className = 'kb-status';
 
   try {
-    const base64 = await readFileAsBase64(file);
-    const text   = await extractPDFText(base64, settings);
+    const text = await extractPDFText(file);
     document.getElementById(`kb-${type}`).value = text;
     setKBStatus(type, text.length);
   } catch (err) {
@@ -434,65 +431,28 @@ async function handleKBPDF(file, type) {
   }
 }
 
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const result = e.target.result;
-      if (!result || typeof result !== 'string') { reject(new Error('ファイルの読み込みに失敗しました')); return; }
-      const base64 = result.split(',')[1];
-      if (!base64) { reject(new Error('Base64変換に失敗しました')); return; }
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('ファイル読み込みエラー: ' + (reader.error?.message || '不明')));
-    reader.onabort = () => reject(new Error('ファイル読み込みが中断されました'));
-    reader.readAsDataURL(file);
-  });
-}
 
-async function extractPDFText(base64Data, settings) {
-  const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), 60000);
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'x-api-key': settings.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'pdfs-2024-09-25',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-ipc': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 32000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } },
-            { type: 'text', text: 'このPDFに含まれる全てのテキストを正確に抽出してください。前置き・説明・コメントは一切不要です。テキストの内容のみを出力してください。' },
-          ],
-        }],
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `APIエラー HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    return data.content?.[0]?.text || '';
-
-  } catch (err) {
-    if (err.name === 'AbortError') throw new Error('タイムアウト（60秒）しました。PDFが大きすぎる可能性があります');
-    if (err.message === 'Failed to fetch') throw new Error('通信エラー。インターネット接続とAPIキーを確認してください');
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
+async function extractPDFText(file) {
+  if (typeof pdfjsLib === 'undefined') {
+    throw new Error('PDF処理ライブラリの読み込みに失敗しました。ページを再読み込みしてください。');
   }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map(item => item.str).join(' ');
+    fullText += pageText + '\n\n';
+  }
+
+  if (!fullText.trim()) {
+    throw new Error('テキストを抽出できませんでした。スキャンされた画像PDFの場合は、テキストを直接入力してください。');
+  }
+
+  return fullText.trim();
 }
 
 function setKBStatus(type, charCount) {

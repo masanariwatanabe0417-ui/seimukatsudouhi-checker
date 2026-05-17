@@ -91,7 +91,6 @@ const API = {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
         'anthropic-beta': 'prompt-caching-2024-07-31',
-        'anthropic-dangerous-direct-browser-ipc': 'true',
       },
       body: JSON.stringify({
         model: model || 'claude-sonnet-4-6',
