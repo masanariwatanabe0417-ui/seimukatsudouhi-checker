@@ -463,6 +463,7 @@ async function extractPDFText(base64Data, settings) {
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'pdfs-2024-09-25',
         'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-ipc': 'true',
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
