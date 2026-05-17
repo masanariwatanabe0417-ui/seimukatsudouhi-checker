@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>政務活動費 審査システム</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="header-brand">
+      <h1>政務活動費 審査システム</h1>
+      <p>横須賀市議会 ／ セムカン連携対応</p>
+    </div>
+    <nav class="header-nav">
+      <button id="btnCases" class="btn-nav">📚 事例ライブラリ</button>
+      <button id="btnKnowledge" class="btn-nav">🧠 知識ベース</button>
+      <button id="btnSettings" class="btn-nav">⚙ 設定</button>
+    </nav>
+  </header>
+
+  <main class="app-main">
+
+    <div class="upload-container">
+
+      <!-- Image upload -->
+      <div class="card">
+        <h2 class="card-title">
+          <span class="step-badge">①</span>
+          セムカン申請画面・領収書をアップロード
+        </h2>
+        <div class="drop-zone paste-zone" id="imageDropZone">
+          <div class="drop-icon">📋</div>
+          <p class="drop-text">スクリーンショットをここに貼り付け</p>
+          <p class="drop-text-sub">Cmd+V（Mac）または Ctrl+V（Windows）</p>
+          <p class="drop-hint">ドラッグ＆ドロップも対応</p>
+          <button type="button" class="file-select-btn" id="imageSelectBtn">📁 ファイルから選択</button>
+          <input type="file" id="imageInput" multiple accept="image/*" class="file-input-hidden">
+        </div>
+        <div id="imagePreview" class="preview-grid"></div>
+      </div>
+
+      <!-- CSV upload -->
+      <div class="card">
+        <h2 class="card-title">
+          <span class="step-badge step-badge-green">②</span>
+          収支明細CSV（任意・一覧チェック用）
+        </h2>
+        <div class="drop-zone" id="csvDropZone">
+          <div class="drop-icon">📊</div>
+          <p class="drop-text">CSVをここにドロップ　またはクリックして選択</p>
+          <p class="drop-hint">セムカンからエクスポートしたCSVファイル</p>
+          <input type="file" id="csvInput" accept=".csv" class="file-input">
+        </div>
+        <div id="csvPreview" class="csv-preview hidden"></div>
+      </div>
+
+    </div>
+
+    <p id="auditWarning" class="audit-warning hidden">
+      ⚠ APIキーが設定されていません。右上の「設定」から Claude API キーを入力してください。
+    </p>
+
+    <button id="btnAudit" class="btn-audit">
+      <span id="auditBtnIcon">🔍</span>
+      <span id="auditBtnText">審査する</span>
+    </button>
+
+    <div id="resultsSection" class="results-section hidden"></div>
+
+  </main>
+
+  <!-- ===== 知識ベース モーダル ===== -->
+  <div id="modalKnowledge" class="modal hidden">
+    <div class="modal-overlay" data-close="modalKnowledge"></div>
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <div>
+          <h2>🧠 知識ベース</h2>
+          <p class="modal-subtitle">ファイルをアップロード（TXT・CSV・PDF）またはテキストを直接入力してください。登録した内容はAI審査の判断根拠として使用されます。大きなファイルはプロンプトキャッシュで効率化されます。</p>
+        </div>
+        <button class="modal-close" data-close="modalKnowledge">×</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="kb-section">
+          <h3>横須賀市政務活動費条例</h3>
+          <label class="kb-file-label">
+            📎 ファイルをドロップまたはクリック（TXT・CSV・PDF）
+            <input type="file" class="file-input kb-file-input" data-type="ordinance" accept=".txt,.csv,.pdf">
+          </label>
+          <div class="kb-divider">── または直接入力 ──</div>
+          <textarea class="kb-textarea" id="kb-ordinance" placeholder="条例の本文を貼り付けるか、ファイルをアップロードしてください..."></textarea>
+          <div class="kb-status" id="kb-ordinance-status"></div>
+        </div>
+
+        <div class="kb-section">
+          <h3>施行規則</h3>
+          <label class="kb-file-label">
+            📎 ファイルをドロップまたはクリック（TXT・CSV・PDF）
+            <input type="file" class="file-input kb-file-input" data-type="rules" accept=".txt,.csv,.pdf">
+          </label>
+          <div class="kb-divider">── または直接入力 ──</div>
+          <textarea class="kb-textarea" id="kb-rules" placeholder="施行規則の本文を貼り付けるか、ファイルをアップロードしてください..."></textarea>
+          <div class="kb-status" id="kb-rules-status"></div>
+        </div>
+
+        <div class="kb-section">
+          <h3>運用マニュアル <span class="kb-badge-cache">⚡ キャッシュ対応</span></h3>
+          <p class="kb-note">1MB以上のマニュアルもキャッシュ技術により、2回目以降のAPI呼び出しコストが約1/10になります。</p>
+          <label class="kb-file-label">
+            📎 ファイルをドロップまたはクリック（TXT・CSV・PDF）
+            <input type="file" class="file-input kb-file-input" data-type="manual" accept=".txt,.csv,.pdf">
+          </label>
+          <div class="kb-divider">── または直接入力 ──</div>
+          <textarea class="kb-textarea" id="kb-manual" placeholder="運用マニュアルを貼り付けるか、ファイルをアップロードしてください..."></textarea>
+          <div class="kb-status" id="kb-manual-status"></div>
+        </div>
+
+        <div class="kb-section">
+          <h3>参考判例</h3>
+          <label class="kb-file-label">
+            📎 ファイルをドロップまたはクリック（TXT・CSV・PDF）
+            <input type="file" class="file-input kb-file-input" data-type="precedents" accept=".txt,.csv,.pdf">
+          </label>
+          <div class="kb-divider">── または直接入力 ──</div>
+          <textarea class="kb-textarea" id="kb-precedents" placeholder="参考判例を貼り付けるか、ファイルをアップロードしてください..."></textarea>
+          <div class="kb-status" id="kb-precedents-status"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button id="saveKnowledge" class="btn-primary">💾 保存</button>
+        <span id="kbSaveStatus" class="save-status"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 事例ライブラリ モーダル ===== -->
+  <div id="modalCases" class="modal hidden">
+    <div class="modal-overlay" data-close="modalCases"></div>
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <div>
+          <h2>📚 事例ライブラリ</h2>
+          <p class="modal-subtitle">審査結果が蓄積されます。事例が増えるほどAIの審査精度・一貫性が向上します（Skillを育てる仕組み）。</p>
+        </div>
+        <button class="modal-close" data-close="modalCases">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="casesCount" class="cases-count"></div>
+        <div id="casesList" class="cases-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="exportCases" class="btn-secondary">📥 JSONエクスポート</button>
+        <button id="clearCases" class="btn-danger">🗑 全削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 設定 モーダル ===== -->
+  <div id="modalSettings" class="modal hidden">
+    <div class="modal-overlay" data-close="modalSettings"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2>⚙ 設定</h2>
+          <p class="modal-subtitle">APIキーはこのPC内にのみ保存されます。</p>
+        </div>
+        <button class="modal-close" data-close="modalSettings">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="apiKey">Claude API キー</label>
+          <input type="password" id="apiKey" placeholder="sk-ant-api03-..." class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="modelSelect">モデル</label>
+          <select id="modelSelect" class="form-select">
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6（推奨・高精度）</option>
+            <option value="claude-opus-4-7">claude-opus-4-7（最高精度）</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5（高速・低コスト）</option>
+          </select>
+        </div>
+        <div class="info-box">
+          <h4>💡 コスト最適化について</h4>
+          <p>知識ベースに登録したマニュアル（1MB超でも）は<strong>プロンプトキャッシュ</strong>で自動的に効率化されます。初回のみ通常コストがかかり、2回目以降はキャッシュ読み込みで<strong>約1/10のコスト</strong>になります。</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="saveSettings" class="btn-primary">💾 保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 事例保存 モーダル ===== -->
+  <div id="modalSaveCase" class="modal hidden">
+    <div class="modal-overlay" data-close="modalSaveCase"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h2>💾 審査結果を事例として保存</h2></div>
+        <button class="modal-close" data-close="modalSaveCase">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>費目カテゴリ</label>
+          <select id="saveCaseType" class="form-select">
+            <option value="">選択してください</option>
+            <option value="視察費">視察費</option>
+            <option value="会議費">会議費</option>
+            <option value="資料購入費">資料購入費</option>
+            <option value="広報費">広報費</option>
+            <option value="事務所費">事務所費</option>
+            <option value="人件費">人件費</option>
+            <option value="研修費">研修費</option>
+            <option value="通信費">通信費</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>金額（円）</label>
+          <input type="number" id="saveCaseAmount" class="form-input" placeholder="例：50000">
+        </div>
+        <div class="form-group">
+          <label>メモ（任意）</label>
+          <textarea id="saveCaseNotes" class="form-input" rows="3" placeholder="特記事項・備考など..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="confirmSaveCase" class="btn-primary">保存する</button>
+        <button id="cancelSaveCase" class="btn-secondary">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
