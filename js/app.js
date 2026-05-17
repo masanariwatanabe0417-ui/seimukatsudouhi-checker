@@ -187,17 +187,13 @@ function clearCSV() {
 }
 
 function updateAuditButton() {
-  const settings = Storage.getSettings();
   const hasContent = state.images.length > 0 || !!state.csvText;
-  const hasKey = !!settings.apiKey;
-
   document.getElementById('btnAudit').disabled = !hasContent;
-  document.getElementById('auditWarning').classList.toggle('hidden', hasKey);
+  document.getElementById('auditWarning').classList.add('hidden');
 }
 
 async function runAudit() {
   const settings = Storage.getSettings();
-  if (!settings.apiKey) { openModal('modalSettings'); return; }
 
   const btn     = document.getElementById('btnAudit');
   const btnIcon = document.getElementById('auditBtnIcon');
@@ -357,7 +353,6 @@ function closeModal(id) {
 
 function loadSettingsToForm() {
   const s = Storage.getSettings();
-  document.getElementById('apiKey').value = s.apiKey || '';
   document.getElementById('modelSelect').value = s.model || 'claude-sonnet-4-6';
 }
 
@@ -375,9 +370,8 @@ function setupButtons() {
 }
 
 function saveSettings() {
-  const apiKey = document.getElementById('apiKey').value.trim();
-  const model  = document.getElementById('modelSelect').value;
-  Storage.saveSettings({ apiKey, model });
+  const model = document.getElementById('modelSelect').value;
+  Storage.saveSettings({ model });
   closeModal('modalSettings');
   updateAuditButton();
   const btn = document.getElementById('saveSettings');

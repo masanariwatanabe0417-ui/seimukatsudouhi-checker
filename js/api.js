@@ -1,6 +1,6 @@
 // Claude API client with prompt caching
 const API = {
-  URL: 'https://api.anthropic.com/v1/messages',
+  URL: 'https://seimukatsudouhi-proxy.masanari-watanabe0417.workers.dev',
 
   buildSystem(kb, cases) {
     const content = [];
@@ -76,9 +76,8 @@ const API = {
   },
 
   async call({ images, csvText, knowledgeBase, cases, settings }) {
-    const { apiKey, model } = settings;
+    const { model } = settings;
 
-    if (!apiKey) throw new Error('APIキーが設定されていません。右上の「設定」から入力してください。');
     if (images.length === 0 && !csvText) throw new Error('画像またはCSVをアップロードしてください。');
 
     const systemContent = this.buildSystem(knowledgeBase, cases);
@@ -87,11 +86,9 @@ const API = {
     const res = await fetch(this.URL, {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
         'anthropic-beta': 'prompt-caching-2024-07-31',
-        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model: model || 'claude-sonnet-4-6',

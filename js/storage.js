@@ -20,11 +20,14 @@ const Storage = {
   },
 
   getSettings() {
-    return this._get('smc_settings', { apiKey: '', model: 'claude-sonnet-4-6' });
+    const s = this._get('smc_settings', { model: 'claude-sonnet-4-6' });
+    const { apiKey: _removed, ...rest } = s;
+    return rest;
   },
 
   saveSettings(settings) {
-    return this._set('smc_settings', settings);
+    const { apiKey: _removed, ...rest } = settings;
+    return this._set('smc_settings', rest);
   },
 
   getKnowledgeBase() {
